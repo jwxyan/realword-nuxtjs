@@ -22,8 +22,6 @@ export default ({ store }) => {
         // 请求就会经过这里
         const { user } = store.state
 
-        console.log(user)
-
         if (user && user.token) {
             config.headers.Authorization = `Token ${user.token}`
         }

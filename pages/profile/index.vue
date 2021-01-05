@@ -5,16 +5,33 @@
         <div class="container">
           <div class="row">
             <div class="col-xs-12 col-md-10 offset-md-1">
-              <img src="http://i.imgur.com/Qr71crq.jpg" class="user-img" />
-              <h4>Eric Simons</h4>
+              <img :src="profile.image" class="user-img" />
+              <h4>{{ profile.username }}</h4>
               <p>
-                Cofounder @GoThinkster, lived in Aol's HQ for a few months,
-                kinda looks like Peeta from the Hunger Games
+                {{ profile.bio }}
               </p>
-              <button class="btn btn-sm btn-outline-secondary action-btn">
-                <i class="ion-plus-round"></i>
-                &nbsp; Follow Eric Simons
-              </button>
+              <template v-if="isOwn">
+                <nuxt-link
+                  to="/settings"
+                  class="btn btn-sm btn-outline-secondary action-btn"
+                >
+                  <i class="ion-gear-a"></i> Edit Profile Settings
+                </nuxt-link>
+              </template>
+              <template v-else>
+                <button
+                  class="btn btn-sm btn-outline-secondary action-btn"
+                  @click="followHandler"
+                >
+                  <i class="ion-plus-round"></i>
+                  &nbsp;
+                  {{
+                    profile.following
+                      ? `unFollow ${profile.username}`
+                      : `Follow ${profile.username}`
+                  }}
+                </button>
+              </template>
             </div>
           </div>
         </div>
@@ -26,55 +43,92 @@
             <div class="articles-toggle">
               <ul class="nav nav-pills outline-active">
                 <li class="nav-item">
-                  <a class="nav-link active" href="">My Articles</a>
+                  <nuxt-link
+                    class="nav-link"
+                    :class="{
+                      active: !isFavorited,
+                    }"
+                    exact
+                    :to="{
+                      name: 'profile',
+                      params: {
+                        username: profile.username,
+                      },
+                    }"
+                    >My Articles
+                  </nuxt-link>
                 </li>
                 <li class="nav-item">
-                  <a class="nav-link" href="">Favorited Articles</a>
+                  <nuxt-link
+                    class="nav-link"
+                    :class="{
+                      active: isFavorited,
+                    }"
+                    exact
+                    :to="{
+                      name: 'favoriteProfile',
+                      params: {
+                        username: profile.username,
+                        tag: 'favorites',
+                      },
+                    }"
+                    >Favorited Articles
+                  </nuxt-link>
                 </li>
               </ul>
             </div>
 
-            <div class="article-preview">
+            <div
+              class="article-preview"
+              v-for="article in articles"
+              :key="article.slug"
+            >
               <div class="article-meta">
-                <a href=""><img src="http://i.imgur.com/Qr71crq.jpg" /></a>
+                <nuxt-link
+                  :to="{
+                    name: 'profile',
+                    params: {
+                      username: article.author.username,
+                    },
+                  }"
+                  ><img :src="article.author.image" />
+                </nuxt-link>
                 <div class="info">
-                  <a href="" class="author">Eric Simons</a>
-                  <span class="date">January 20th</span>
+                  <nuxt-link
+                    :to="{
+                      name: 'profile',
+                      params: {
+                        username: article.author.username,
+                      },
+                    }"
+                    class="author"
+                    >{{ article.author.username }}</nuxt-link
+                  >
+                  <span class="date">{{
+                    article.createdAt | date("MMM DD, YYYY")
+                  }}</span>
                 </div>
-                <button class="btn btn-outline-primary btn-sm pull-xs-right">
-                  <i class="ion-heart"></i> 29
+                <button
+                  class="btn btn-outline-primary btn-sm pull-xs-right"
+                  :class="{ active: article.favorited }"
+                  @click="onFavorite(article)"
+                >
+                  <i class="ion-heart"></i> {{ article.favoritesCount }}
                 </button>
               </div>
-              <a href="" class="preview-link">
-                <h1>How to build webapps that scale</h1>
-                <p>This is the description for the post.</p>
+              <nuxt-link
+                :to="{
+                  name: 'article',
+                  params: {
+                    slug: article.slug,
+                  },
+                }"
+                class="preview-link"
+              >
+                <h1>{{ article.title }}</h1>
+                <p>{{ article.description }}</p>
                 <span>Read more...</span>
-              </a>
-            </div>
-
-            <div class="article-preview">
-              <div class="article-meta">
-                <a href=""><img src="http://i.imgur.com/N4VcUeJ.jpg" /></a>
-                <div class="info">
-                  <a href="" class="author">Albert Pai</a>
-                  <span class="date">January 20th</span>
-                </div>
-                <button class="btn btn-outline-primary btn-sm pull-xs-right">
-                  <i class="ion-heart"></i> 32
-                </button>
-              </div>
-              <a href="" class="preview-link">
-                <h1>
-                  The song you won't ever stop singing. No matter how hard you
-                  try.
-                </h1>
-                <p>This is the description for the post.</p>
-                <span>Read more...</span>
-                <ul class="tag-list">
-                  <li class="tag-default tag-pill tag-outline">Music</li>
-                  <li class="tag-default tag-pill tag-outline">Song</li>
-                </ul>
-              </a>
+              </nuxt-link>
             </div>
           </div>
         </div>
@@ -84,8 +138,45 @@
 </template>
 
 <script>
+import { getProfiles, follow, unFollow } from "@/api/user";
+import { getArticles } from "@/api/article";
+
 export default {
   name: "ProfileIndex",
+  middleware: "authenticated",
+  async asyncData({ params }) {
+    const { data } = await getProfiles(params.username);
+    const { profile } = data;
+
+    const Articledata =
+      params.tag === "favorites"
+        ? await getArticles({ favorited: params.username, limit: 5, offset: 0 })
+        : await getArticles({ author: params.username, limit: 5, offset: 0 });
+    const { articles } = Articledata.data;
+
+    return {
+      profile,
+      articles,
+    };
+  },
+  computed: {
+    isOwn() {
+      return this.profile.username === this.$store.state.user.username;
+    },
+    isFavorited() {
+      return this.$route.params.tag === "favorites";
+    },
+  },
+  methods: {
+    async followHandler() {
+      const { data } = this.profile.following
+        ? await unFollow(this.profile.username)
+        : await follow(this.profile.username);
+
+      const { profile } = data;
+      this.profile = profile;
+    },
+  },
 };
 </script>
 

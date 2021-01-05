@@ -9,6 +9,15 @@ export const getArticles = params => {
     })
 }
 
+// 创建一个新的文章
+export const newArticle = data => {
+    return request({
+        method: 'POST',
+        url: '/api/articles',
+        data
+    })
+}
+
 // 获取文章列关注文章列表
 export const getFeedArticles = params => {
     return request({
@@ -47,5 +56,22 @@ export const getComments = slug => {
     return request({
         method: 'GET',
         url: `/api/articles/${slug}/comments`
+    })
+}
+
+// 获取文章详情
+export const deleteArticle = slug => {
+    return request({
+        method: 'DELETE',
+        url: `/api/articles/${slug}`
+    })
+}
+
+// 更新文章详情
+export const updateArticle = (slug, data) => {
+    return request({
+        method: 'PUT',
+        url: `/api/articles/${slug}`,
+        data
     })
 }
